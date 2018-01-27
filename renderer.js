@@ -135,13 +135,13 @@ varying vec2 v_texcoord;
 uniform sampler2D u_texture;
 
 void main() {
-  vec4 textColor = texture2D(u_texture, v_texcoord);
-  gl_FragColor = vec4(textColor.r, textColor.g, textColor.b, (textColor.r + textColor.b + textColor.g) / 3.0);
+  gl_FragColor = texture2D(u_texture, v_texcoord);
 }
 `
 
 gl.enable(gl.BLEND);
-gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_COLOR);
+gl.blendColor(0.0, 0.0, 0.0, 1.0);
+gl.blendFuncSeparate(gl.CONSTANT_COLOR, gl.ONE_MINUS_SRC_COLOR, gl.ZERO, gl.ONE);
 
 const program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
 gl.useProgram(program);
@@ -186,7 +186,7 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
 gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-gl.clearColor(0, 0, 0.1, 1.0);
+gl.clearColor(0.4, 0.5, 1.0, 1.0);
 gl.clear(gl.COLOR_BUFFER_BIT);
 gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 gl.enableVertexAttribArray(positionLocation);
