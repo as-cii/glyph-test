@@ -202,6 +202,38 @@ gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 gl.clearColor(bc[0], bc[1], bc[2], 1.0);
 gl.clear(gl.COLOR_BUFFER_BIT);
 
+const canvasTexture = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, canvasTexture);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCtx.canvas);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+const positionBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+const positions = new Float32Array([
+  0, 0,
+  0, 1,
+  1, 0,
+  1, 0,
+  0, 1,
+  1, 1
+])
+gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+const texcoordBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+const texcoords = new Float32Array([
+  0, 0,
+  0, 1,
+  1, 0,
+  1, 0,
+  0, 1,
+  1, 1
+])
+gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.STATIC_DRAW);
+
+
 const program1 = createProgram(gl, vertexShaderSource, fragmentShaderPass1);
 gl.useProgram(program1);
 gl.blendFuncSeparate(gl.ZERO, gl.ONE_MINUS_SRC_COLOR, gl.ZERO, gl.ONE);
@@ -231,13 +263,6 @@ function createShader (gl, source, type) {
 }
 
 function draw (gl, program) {
-  const canvasTexture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, canvasTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCtx.canvas);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
   const positionLocation = gl.getAttribLocation(program, "a_position");
   const texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
 
@@ -245,44 +270,16 @@ function draw (gl, program) {
   const matrixLocation = gl.getUniformLocation(program, "u_matrix");
   const textureLocation = gl.getUniformLocation(program, "u_texture");
 
-  const positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  const positions = new Float32Array([
-    0, 0,
-    0, 1,
-    1, 0,
-    1, 0,
-    0, 1,
-    1, 1
-  ])
-  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-
-  const texcoordBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
-  const texcoords = new Float32Array([
-    0, 0,
-    0, 1,
-    1, 0,
-    1, 0,
-    0, 1,
-    1, 1
-  ])
-  gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.STATIC_DRAW);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(positionLocation);
+
   gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
-  gl.enableVertexAttribArray(texcoordLocation);
   gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(texcoordLocation);
 
   let matrix = orthographic(0, gl.canvas.width, gl.canvas.height, 0, -1, 1);
-
-  // this matrix will translate our quad to dstX, dstY
   matrix = translate(matrix, 0, 0, 0);
-
-  // this matrix will scale our 1 unit quad
-  // from 1 unit to texWidth, texHeight units
   matrix = scale(matrix, width, height, 1);
 
   // Set the matrix.
