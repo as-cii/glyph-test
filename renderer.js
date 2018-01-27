@@ -94,20 +94,57 @@ function translate(m, tx, ty, tz, dst) {
   return dst;
 }
 
-const width = 150
-const height = 150
+function rgbString (r, g, b) {
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+function hexToRGB (hex) {
+  return [hexToR(hex), hexToG(hex), hexToB(hex)]
+}
+
+function hexToR(h) {return parseInt((cutHex(h)).substring(0,2),16)}
+function hexToG(h) {return parseInt((cutHex(h)).substring(2,4),16)}
+function hexToB(h) {return parseInt((cutHex(h)).substring(4,6),16)}
+function cutHex(h) {return (h.charAt(0)=="#") ? h.substring(1,7):h}
+
+// const foregroundColor = hexToRGB("#00000")
+const foregroundColor = hexToRGB("#111111")
+// const foregroundColor = [123, 45, 38]
+// const foregroundColor = [255, 255, 255]
+// const backgroundColor = [171, 161, 148]
+// const backgroundColor = [0, 0, 0]
+// const backgroundColor = hexToRGB("#FFFCEB")
+const backgroundColor = hexToRGB("#137752")
+
+const width = 300
+const height = 20
+const string = "Lorem ipsum dolor"
+const font = "12px FiraCode-Regular"
 const textCtx = document.createElement("canvas").getContext("2d", {alpha: false});
 textCtx.canvas.width  = width;
 textCtx.canvas.height = height;
-textCtx.font = "20px Monaco";
+textCtx.font = font;
 textCtx.textAlign = "center";
 textCtx.textBaseline = "middle";
-textCtx.fillStyle = "black";
-textCtx.fillRect(0, 0, width, height);
 textCtx.fillStyle = "white";
-textCtx.fillText("Hello", width / 2, height / 2);
+textCtx.fillRect(0, 0, width, height);
+textCtx.fillStyle = "black";
+textCtx.fillText(string, width / 2, height / 2);
 
 document.body.appendChild(textCtx.canvas)
+
+const refCtx = document.createElement("canvas").getContext("2d", {alpha: false});
+refCtx.canvas.width  = width;
+refCtx.canvas.height = height;
+refCtx.font = font;
+refCtx.textAlign = "center";
+refCtx.textBaseline = "middle";
+refCtx.fillStyle = rgbString(...backgroundColor);
+refCtx.fillRect(0, 0, width, height);
+refCtx.fillStyle = rgbString(...foregroundColor);
+refCtx.fillText(string, width / 2, height / 2);
+
+document.body.appendChild(refCtx.canvas)
 
 const gl = document.createElement("canvas").getContext("webgl");
 gl.canvas.width = textCtx.canvas.width
@@ -127,7 +164,10 @@ void main() {
 }
 `
 
-const fragmentShaderSource = `
+const fc = foregroundColor.map(f => f / 255)
+const bc = backgroundColor.map(f => f / 255)
+
+const fragmentShaderPass1 = `
 precision mediump float;
 
 varying vec2 v_texcoord;
@@ -135,88 +175,50 @@ varying vec2 v_texcoord;
 uniform sampler2D u_texture;
 
 void main() {
-  gl_FragColor = texture2D(u_texture, v_texcoord);
+  vec3 textColor = vec3(${fc[0]}, ${fc[1]}, ${fc[2]});
+  vec3 a = texture2D(u_texture, v_texcoord).rgb;
+  a = mix(vec3(1.0) - a, sqrt(vec3(1.0) - a * a), textColor);
+  gl_FragColor = vec4(a, 1.0);
+}
+`
+
+const fragmentShaderPass2 = `
+precision mediump float;
+
+varying vec2 v_texcoord;
+
+uniform sampler2D u_texture;
+
+void main() {
+  vec3 textColor = vec3(${fc[0]}, ${fc[1]}, ${fc[2]});
+  vec3 a = texture2D(u_texture, v_texcoord).rgb;
+  a = mix(vec3(1.0) - a, sqrt(vec3(1.0) - a * a), textColor);
+  gl_FragColor = vec4(textColor, 1.0) * vec4(a, 1.0);
 }
 `
 
 gl.enable(gl.BLEND);
-gl.blendColor(0.0, 0.0, 0.0, 1.0);
-gl.blendFuncSeparate(gl.CONSTANT_COLOR, gl.ONE_MINUS_SRC_COLOR, gl.ZERO, gl.ONE);
-
-const program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
-gl.useProgram(program);
-
-const positionLocation = gl.getAttribLocation(program, "a_position");
-const texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
-
-// lookup uniforms
-const matrixLocation = gl.getUniformLocation(program, "u_matrix");
-const textureLocation = gl.getUniformLocation(program, "u_texture");
-
-const positionBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-const positions = new Float32Array([
-  0, 0,
-  0, 1,
-  1, 0,
-  1, 0,
-  0, 1,
-  1, 1
-])
-gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-
-
-const texcoordBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
-const texcoords = new Float32Array([
-  0, 0,
-  0, 1,
-  1, 0,
-  1, 0,
-  0, 1,
-  1, 1
-])
-gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.STATIC_DRAW);
-
-const canvasTexture = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D, canvasTexture);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCtx.canvas);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
 gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-gl.clearColor(0.4, 0.5, 1.0, 1.0);
+gl.clearColor(bc[0], bc[1], bc[2], 1.0);
 gl.clear(gl.COLOR_BUFFER_BIT);
-gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-gl.enableVertexAttribArray(positionLocation);
-gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
-gl.enableVertexAttribArray(texcoordLocation);
-gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
 
-let matrix = orthographic(0, gl.canvas.width, gl.canvas.height, 0, -1, 1);
+const program1 = createProgram(gl, vertexShaderSource, fragmentShaderPass1);
+gl.useProgram(program1);
+gl.blendFuncSeparate(gl.ZERO, gl.ONE_MINUS_SRC_COLOR, gl.ZERO, gl.ONE);
+draw(gl, program1)
 
-// this matrix will translate our quad to dstX, dstY
-matrix = translate(matrix, 0, 0, 0);
-
-// this matrix will scale our 1 unit quad
-// from 1 unit to texWidth, texHeight units
-matrix = scale(matrix, 150, 150, 1);
-
-// Set the matrix.
-gl.uniformMatrix4fv(matrixLocation, false, matrix);
-
-// Tell the shader to get the texture from texture unit 0
-gl.uniform1i(textureLocation, 0);
-
-// draw the quad (2 triangles, 6 vertices)
+const program2 = createProgram(gl, vertexShaderSource, fragmentShaderPass2);
+gl.useProgram(program2);
+gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE);
 gl.drawArrays(gl.TRIANGLES, 0, 6);
+draw(gl, program2)
+
+
 
 function createProgram (gl, vertexShaderSource, fragmentShaderSource) {
   const program = gl.createProgram();
-  gl.attachShader(program, createShader(gl, vertexShaderSource, gl.VERTEX_SHADER));
-  gl.attachShader(program, createShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER));
+  if (vertexShaderSource) gl.attachShader(program, createShader(gl, vertexShaderSource, gl.VERTEX_SHADER));
+  if (fragmentShaderSource) gl.attachShader(program, createShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER));
   gl.linkProgram(program);
   return program
 }
@@ -226,6 +228,71 @@ function createShader (gl, source, type) {
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   return shader
+}
+
+function draw (gl, program) {
+  const canvasTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, canvasTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCtx.canvas);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const positionLocation = gl.getAttribLocation(program, "a_position");
+  const texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
+
+  // lookup uniforms
+  const matrixLocation = gl.getUniformLocation(program, "u_matrix");
+  const textureLocation = gl.getUniformLocation(program, "u_texture");
+
+  const positionBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  const positions = new Float32Array([
+    0, 0,
+    0, 1,
+    1, 0,
+    1, 0,
+    0, 1,
+    1, 1
+  ])
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+  const texcoordBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+  const texcoords = new Float32Array([
+    0, 0,
+    0, 1,
+    1, 0,
+    1, 0,
+    0, 1,
+    1, 1
+  ])
+  gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.STATIC_DRAW);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+  gl.enableVertexAttribArray(texcoordLocation);
+  gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+  let matrix = orthographic(0, gl.canvas.width, gl.canvas.height, 0, -1, 1);
+
+  // this matrix will translate our quad to dstX, dstY
+  matrix = translate(matrix, 0, 0, 0);
+
+  // this matrix will scale our 1 unit quad
+  // from 1 unit to texWidth, texHeight units
+  matrix = scale(matrix, width, height, 1);
+
+  // Set the matrix.
+  gl.uniformMatrix4fv(matrixLocation, false, matrix);
+
+  // Tell the shader to get the texture from texture unit 0
+  gl.uniform1i(textureLocation, 0);
+
+  // draw the quad (2 triangles, 6 vertices)
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
 document.body.appendChild(gl.canvas)
